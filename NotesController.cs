@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using NotesApi.Models;
-using System;
-using System.Collections.Generic;
 using Microsoft.Data.SqlClient;
-using System.Linq;
 using Dapper;
 
 namespace NotesApi.Controllers
