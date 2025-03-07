@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using NotesApi.Models;
 using Microsoft.Data.SqlClient;
 using Dapper;
+using System.Threading.Tasks;
 
 namespace NotesApi.Controllers
 {
@@ -16,22 +17,44 @@ namespace NotesApi.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
         }
 
+        /// <summary>
+        /// Gets a paginated list of notes.
+        /// </summary>
+        /// <param name="page">The page number.</param>
+        /// <param name="pageSize">The number of items per page.</param>
+        /// <returns>A paginated list of notes.</returns>
         [HttpGet]
-        public ActionResult<IEnumerable<Note>> GetNotes()
+        public async Task<ActionResult> GetNotes(int page = 1, int pageSize = 10)
         {
             using (var connection = new SqlConnection(_connectionString))
             {
-                var notes = connection.Query<Note>("SELECT * FROM Notes").ToList();
-                return Ok(notes);
+                var offset = (page - 1) * pageSize;
+                var notes = (await connection.QueryAsync<Note>("SELECT * FROM Notes ORDER BY Id OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", new { Offset = offset, PageSize = pageSize })).ToList();
+                var totalNotes = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM Notes");
+
+                var result = new
+                {
+                    TotalCount = totalNotes,
+                    Page = page,
+                    PageSize = pageSize,
+                    Notes = notes
+                };
+
+                return Ok(result);
             }
         }
 
+        /// <summary>
+        /// Gets a note by its ID.
+        /// </summary>
+        /// <param name="id">The ID of the note.</param>
+        /// <returns>The note with the specified ID.</returns>
         [HttpGet("{id}")]
-        public ActionResult<Note> GetNoteById(int id)
+        public async Task<ActionResult<Note>> GetNoteById(int id)
         {
             using (var connection = new SqlConnection(_connectionString))
             {
-                var note = connection.QuerySingleOrDefault<Note>("SELECT * FROM Notes WHERE Id = @Id", new { Id = id });
+                var note = await connection.QuerySingleOrDefaultAsync<Note>("SELECT * FROM Notes WHERE Id = @Id", new { Id = id });
                 if (note == null)
                 {
                     return NotFound();
@@ -40,28 +63,39 @@ namespace NotesApi.Controllers
             }
         }
 
+        /// <summary>
+        /// Creates a new note.
+        /// </summary>
+        /// <param name="note">The note to create.</param>
+        /// <returns>The created note.</returns>
         [HttpPost]
-        public ActionResult<Note> CreateNote([FromBody] Note note)
+        public async Task<ActionResult<Note>> CreateNote([FromBody] Note note)
         {
             note.CreatedAt = DateTime.UtcNow;
             note.UpdatedAt = DateTime.UtcNow;
 
             using (var connection = new SqlConnection(_connectionString))
             {
-                var id = connection.QuerySingle<int>("INSERT INTO Notes (Title, Content, CreatedAt, UpdatedAt) VALUES (@Title, @Content, @CreatedAt, @UpdatedAt); SELECT CAST(SCOPE_IDENTITY() as int);", note);
+                var id = await connection.QuerySingleAsync<int>("INSERT INTO Notes (Title, Content, CreatedAt, UpdatedAt) VALUES (@Title, @Content, @CreatedAt, @UpdatedAt); SELECT CAST(SCOPE_IDENTITY() as int);", note);
                 note.Id = id;
                 return CreatedAtAction(nameof(GetNoteById), new { id = note.Id }, note);
             }
         }
 
+        /// <summary>
+        /// Updates an existing note.
+        /// </summary>
+        /// <param name="id">The ID of the note to update.</param>
+        /// <param name="note">The updated note.</param>
+        /// <returns>No content if the update was successful.</returns>
         [HttpPut("{id}")]
-        public IActionResult UpdateNote(int id, [FromBody] Note note)
+        public async Task<IActionResult> UpdateNote(int id, [FromBody] Note note)
         {
             note.UpdatedAt = DateTime.UtcNow;
 
             using (var connection = new SqlConnection(_connectionString))
             {
-                var affectedRows = connection.Execute("UPDATE Notes SET Title = @Title, Content = @Content, UpdatedAt = @UpdatedAt WHERE Id = @Id", new { note.Title, note.Content, note.UpdatedAt, Id = id });
+                var affectedRows = await connection.ExecuteAsync("UPDATE Notes SET Title = @Title, Content = @Content, UpdatedAt = @UpdatedAt WHERE Id = @Id", new { note.Title, note.Content, note.UpdatedAt, Id = id });
                 if (affectedRows == 0)
                 {
                     return NotFound();
@@ -70,12 +104,17 @@ namespace NotesApi.Controllers
             }
         }
 
+        /// <summary>
+        /// Deletes a note by its ID.
+        /// </summary>
+        /// <param name="id">The ID of the note to delete.</param>
+        /// <returns>No content if the deletion was successful.</returns>
         [HttpDelete("{id}")]
-        public IActionResult DeleteNote(int id)
+        public async Task<IActionResult> DeleteNote(int id)
         {
             using (var connection = new SqlConnection(_connectionString))
             {
-                var affectedRows = connection.Execute("DELETE FROM Notes WHERE Id = @Id", new { Id = id });
+                var affectedRows = await connection.ExecuteAsync("DELETE FROM Notes WHERE Id = @Id", new { Id = id });
                 if (affectedRows == 0)
                 {
                     return NotFound();
