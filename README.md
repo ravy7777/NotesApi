@@ -29,7 +29,29 @@ This is a simple Notes API built with ASP.NET Core and Dapper for managing notes
     }
     ```
 
-4. Run the application:
+4. Install the `dotnet-ef` tool globally (if not already installed):
+    ```sh
+    dotnet tool install --global dotnet-ef
+    ```
+
+5. Add the necessary Entity Framework Core packages to your project:
+    ```sh
+    dotnet add package Microsoft.EntityFrameworkCore
+    dotnet add package Microsoft.EntityFrameworkCore.SqlServer
+    dotnet add package Microsoft.EntityFrameworkCore.Tools
+    ```
+
+6. Create the initial migration:
+    ```sh
+    dotnet ef migrations add InitialCreate
+    ```
+
+7. Update the database:
+    ```sh
+    dotnet ef database update
+    ```
+
+8. Run the application:
     ```sh
     dotnet run
     ```

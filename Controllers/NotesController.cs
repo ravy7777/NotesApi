@@ -24,14 +24,14 @@ namespace NotesApi.Controllers
         /// <param name="pageSize">The number of items per page.</param>
         /// <returns>A paginated list of notes.</returns>
         [HttpGet]
-        public async Task<ActionResult> GetNotes(int page = 1, int pageSize = 10)
+             public async Task<ActionResult> GetNotes(int page = 1, int pageSize = 10)
         {
             using (var connection = new SqlConnection(_connectionString))
             {
                 var offset = (page - 1) * pageSize;
-                var notes = (await connection.QueryAsync<Note>("SELECT * FROM Notes ORDER BY Id OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", new { Offset = offset, PageSize = pageSize })).ToList();
+                var notes = (await connection.QueryAsync<Note>("SELECT * FROM Notes ORDER BY Id DESC OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY", new { Offset = offset, PageSize = pageSize })).ToList();
                 var totalNotes = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM Notes");
-
+        
                 var result = new
                 {
                     TotalCount = totalNotes,
@@ -39,7 +39,7 @@ namespace NotesApi.Controllers
                     PageSize = pageSize,
                     Notes = notes
                 };
-
+        
                 return Ok(result);
             }
         }
